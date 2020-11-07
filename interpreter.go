@@ -11,13 +11,13 @@ type interpreter struct {
 	dp   int
 	data []byte
 
-	/*
-	  output []byte
-	  input []byte
-	*/
+	output []byte
+	input  chan byte
+	// @Todo: make output a channel
+	//input []byte
 }
 
-func NewInterpreter() *interpreter {
+func newInterpreter() *interpreter {
 	var i interpreter
 	return &i
 }
@@ -30,7 +30,10 @@ func (i *interpreter) openFile(filename string) bool {
 		return false
 	}
 	i.ip = -1
+	i.dp = 0
 	i.data = make([]byte, 1)
+	i.output = make([]byte, 0)
+	i.input = make(chan byte)
 	return true
 }
 
@@ -57,8 +60,15 @@ func (i *interpreter) step() bool {
 	case '-':
 		i.data[i.dp]--
 	case '.':
-		//fmt.Print(string(i.data[i.dp]))
+		i.output = append(i.output, i.data[i.dp])
+		var buf string
+		for _, b := range i.output {
+			buf += convertByteToString(b, outputDisplayMode)
+		}
+		progOutput.SetText(buf)
+	// Signify we are waiting for input
 	case ',':
+		i.data[i.dp] = <-i.input
 	case '[':
 		if i.data[i.dp] == 0 {
 			nests := 1

@@ -2,7 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
+	"strconv"
+	"unicode"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -14,20 +15,49 @@ func check(e error) {
 	}
 }
 
+const (
+	decimal = "decimal"
+	hex     = "hex"
+	ascii   = "ascii"
+	mixed   = "mixed"
+)
+
+func convertByteToString(b byte, mode string) string {
+	switch mode {
+	case decimal:
+		return strconv.Itoa(int(b))
+	case hex:
+		return fmt.Sprintf("%X", int(b))
+	case ascii:
+		if unicode.IsPrint(rune(b)) {
+			return string(b)
+		} else {
+			return "."
+		}
+	case mixed:
+		if unicode.IsPrint(rune(b)) {
+			return "'" + string(b) + "'"
+		} else {
+			return strconv.Itoa(int(b))
+		}
+	}
+	panic("how")
+}
+
 var i *interpreter
 var consoleText *tview.TextView
 var consoleInput *tview.InputField
+var progOutput *tview.TextView
+var app *tview.Application
+
+var dataTapeDisplayMode string = mixed
+var outputDisplayMode string = ascii
 
 func createUI(i *interpreter) {
-	newPrimitive := func(text string) tview.Primitive {
-		return tview.NewTextView().
-			SetTextAlign(tview.AlignCenter).
-			SetText(text)
-	}
-	programTape := newTape("Program Tape", instTape(&i.ip, &i.inst))
-	dataTape := newTape("Data Tape", dataTape(&i.dp, &i.data))
-	progOutput := newPrimitive("Program Output")
-	progInput := newPrimitive("Program Input")
+	programTape := newTape(instTape(&i.ip, &i.inst))
+	dataTape := newTape(dataTape(&i.dp, &i.data))
+	progOutput = tview.NewTextView().
+		SetText("Program Output (ascii)\n")
 	consoleText = tview.NewTextView()
 	consoleInput = tview.NewInputField().
 		SetFieldBackgroundColor(tcell.ColorReset).
@@ -35,25 +65,26 @@ func createUI(i *interpreter) {
 
 	grid := tview.NewGrid().
 		SetRows(2, 2, 0, 1).
-		SetColumns(0, 0, 0).
+		SetColumns(0, 0).
 		SetBorders(true).
-		AddItem(programTape, 0, 0, 1, 3, 0, 0, false).
-		AddItem(dataTape, 1, 0, 1, 3, 0, 0, false).
+		AddItem(programTape, 0, 0, 1, 2, 0, 0, false).
+		AddItem(dataTape, 1, 0, 1, 2, 0, 0, false).
 		AddItem(progOutput, 2, 0, 2, 1, 0, 0, false).
-		AddItem(progInput, 2, 1, 2, 1, 0, 0, false).
-		AddItem(consoleText, 2, 2, 1, 1, 0, 0, false).
-		AddItem(consoleInput, 3, 2, 1, 1, 0, 0, true)
+		AddItem(consoleText, 2, 1, 1, 1, 0, 0, false).
+		AddItem(consoleInput, 3, 1, 1, 1, 0, 0, true)
 
-	if err := tview.NewApplication().SetRoot(grid, true).SetFocus(grid).Run(); err != nil {
+	app = tview.NewApplication()
+	if err := app.SetRoot(grid, true).SetFocus(grid).Run(); err != nil {
 		panic(err)
 	}
 }
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Println("Please provide exactly one brainfuck file as an argument")
-		os.Exit(1)
-	}
-	i = NewInterpreter()
+	/*
+		if len(os.Args) != 2 {
+			fmt.Println("Please provide exactly one brainfuck file as an argument")
+			os.Exit(1)
+		}*/
+	i = newInterpreter()
 	createUI(i)
 }
